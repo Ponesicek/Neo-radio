@@ -1,71 +1,50 @@
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "./components/ui/button";
-import { Slider } from "./components/ui/slider";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { X, ArrowRight } from "lucide-react";
+import { OptionsSidebar, type PlaylistRowData } from "./components/OptionsSidabar";
 import { Separator } from "./components/ui/separator";
+import { Playlist, type SongRowProps } from "./components/Playlist";
+
+const samplePlaylists: PlaylistRowData[] = [
+  { name: "Rock" },
+  { name: "Metal" },
+  { name: "Jazz" },
+  { name: "Classical" },
+  { name: "Electronic" }
+];
+
+const samplePlaylist: SongRowProps[] = [
+  {
+    isSong: true,
+    timeOfPlay: "13:30",
+    artist: "Beatles",
+    name: "Yesterday",
+    thumbnailUrl: "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png"
+  },
+  {
+    isSong: true,
+    timeOfPlay: "13:34",
+    artist: "Queen",
+    name: "Bohemian Rhapsody",
+    thumbnailUrl: "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png"
+  },
+  {
+    isSong: false,
+    timeOfPlay: "13:40",
+    NewsContent: "Breaking news: sky is blue"
+  },
+  {
+    isSong: true,
+    timeOfPlay: "13:45",
+    artist: "Led Zeppelin",
+    name: "Stairway to Heaven",
+    thumbnailUrl: "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png"
+  }
+];
 
 export default function App() {
   return (
     <div className="h-screen w-full bg-gray-100 flex p-4 gap-4">
-      <div className="flex gap-2 flex-col items-center min-w-sm">
-        <h2 className="text-xl">How are we feeling?</h2>
-        <Textarea
-          id="textarea-message"
-          placeholder="Type your message here."
-          className="select-none"
-        />
-        <div className="flex flex-row w-full justify-end">
-          <Button>Tune in</Button>
-        </div>
-        <div className="flex flex-row gap-2 w-full">
-          <span className="min-w-fit">News frequency: </span>{" "}
-          <Slider
-            className="w-full "
-            min={0}
-            max={4}
-            step={1}
-            defaultValue={[0]}
-          />
-        </div>
-        <Table>
-          <TableBody>
-            <TableRowComponent name="Metal" />
-            <TableRowComponent name="Metal" />
-            <TableRowComponent name="Metal" />
-            <TableRowComponent name="Metal" />
-            <TableRowComponent name="Metal" />
-          </TableBody>
-        </Table>
-      </div>
+      <OptionsSidebar playlists={samplePlaylists} />
       <Separator orientation="vertical" />
+      <Playlist items={samplePlaylist} />
     </div>
-  );
-}
-
-function TableRowComponent({ name }: { name: string }) {
-  return (
-    <TableRow>
-      <TableCell className="font-medium w-full">{name}</TableCell>
-      <TableCell>
-        <button>
-          <X size={16} />
-        </button>
-      </TableCell>
-      <TableCell className="text-right">
-        <button>
-          <ArrowRight size={16} />
-        </button>
-      </TableCell>
-    </TableRow>
   );
 }
