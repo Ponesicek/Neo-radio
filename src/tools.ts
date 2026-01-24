@@ -2,19 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import Store from "electron-store";
 import { youtube } from "@googleapis/youtube";
-import { parseDuration } from "./lib/utils";
-
-export interface StoreSchema {
-  music: {
-    youtube: {
-      useMusic: {
-        type: "boolean";
-        default: true;
-      };
-    };
-  };
-  youtubeApiKey: string;
-}
+import { parseDuration, StoreSchema } from "./lib/utils";
 
 const store = new Store<StoreSchema>();
 

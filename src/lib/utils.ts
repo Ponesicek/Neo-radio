@@ -5,6 +5,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export interface StoreSchema {
+  music: {
+    youtube: {
+      useMusic: {
+        type: "boolean";
+        default: true;
+      };
+    };
+  };
+  news: {
+    speech: {
+      provider: {
+        type: "kokoro" | "openAI" | "azure" | "elevenlabs";
+        default: "kokoro";
+      };
+    };
+  };
+  youtubeApiKey: string;
+}
+
 export function parseDuration(isoDuration: string): string {
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return "";

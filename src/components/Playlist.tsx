@@ -1,6 +1,3 @@
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { ThumbsUp, Trash2, ThumbsDown } from "lucide-react";
 
