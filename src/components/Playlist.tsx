@@ -35,52 +35,40 @@ function Playlist({ items }: PlaylistProps) {
 function SongRow(props: SongRowProps) {
   return (
     <TableRow className="flex flex-row w-full justify-between h-16">
-      {props.isSong ? (
-        <div className="">
-          <TableCell>{props.timeOfPlay}</TableCell>
-          <TableCell>
+      <TableCell>
+        {props.isSong ? (
+          <div className="flex items-center gap-4">
+            <span>{props.timeOfPlay}</span>
             <img
               src={props.thumbnailUrl}
               style={{ height: "40px", width: "71px", objectFit: "fill" }}
             />
-          </TableCell>
-          <TableCell>
             <div className="flex flex-col">
               <p className="font-bold">{props.name}</p>
               <p>{props.artist}</p>
             </div>
-          </TableCell>
-        </div>
-      ) : (
-        <div className="items-center flex">
-          <TableCell>{props.timeOfPlay}</TableCell>
-          <TableCell>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <span>{props.timeOfPlay}</span>
             <p className="h-[40px] w-[71px] flex items-center justify-center text-center">
               | | | | | | | | | |
             </p>
-          </TableCell>
-          <TableCell>
             <p>{props.NewsContent}</p>
-          </TableCell>
-        </div>
-      )}
-      <div className="items-center flex flex-row gap-2">
-        <TableCell>
-          <button>
-            <ThumbsUp size={16} />
-          </button>
-        </TableCell>
-        <TableCell>
-          <button>
-            <Trash2 size={16} />
-          </button>
-        </TableCell>
-        <TableCell>
-          <button>
-            <ThumbsDown size={16} />
-          </button>
-        </TableCell>
-      </div>
+          </div>
+        )}
+      </TableCell>
+      <TableCell className="items-center flex flex-row gap-2">
+        <button>
+          <ThumbsUp size={16} />
+        </button>
+        <button>
+          <Trash2 size={16} />
+        </button>
+        <button>
+          <ThumbsDown size={16} />
+        </button>
+      </TableCell>
     </TableRow>
   );
 }

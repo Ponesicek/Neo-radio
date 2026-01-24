@@ -19,3 +19,15 @@ Music recommendation from spotify, youtube and last.fm APIs
 - crossfading
 
 Goal is to make radio for 21th century (imo radios are superior way of listening, but were killed by the hyperpersonalized recommendation engines of streaming services. I plan to bring the best of both worlds together)
+
+## AI Pipeline
+1st pass
+- focus only on creating music playlist, ignoring news.
+- prompt + yt/spotify playlists
+- tools: yt/spotify search, last fm, youtube add
+- LLM: glm4.7 from cerebras for speed
+2nd pass
+- focus only on news
+- prompt + RSS feed
+- tools: query news outlets
+- LLM: glm4.7 from cerebras for speed

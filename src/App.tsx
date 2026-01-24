@@ -1,4 +1,7 @@
-import { OptionsSidebar, type PlaylistRowData } from "./components/OptionsSidabar";
+import {
+  OptionsSidebar,
+  type PlaylistRowData,
+} from "./components/OptionsSidabar";
 import { Separator } from "./components/ui/separator";
 import { Playlist, type SongRowProps } from "./components/Playlist";
 
@@ -7,7 +10,7 @@ const samplePlaylists: PlaylistRowData[] = [
   { name: "Metal" },
   { name: "Jazz" },
   { name: "Classical" },
-  { name: "Electronic" }
+  { name: "Electronic" },
 ];
 
 const samplePlaylist: SongRowProps[] = [
@@ -16,27 +19,30 @@ const samplePlaylist: SongRowProps[] = [
     timeOfPlay: "13:30",
     artist: "Beatles",
     name: "Yesterday",
-    thumbnailUrl: "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png"
+    thumbnailUrl:
+      "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png",
   },
   {
     isSong: true,
     timeOfPlay: "13:34",
     artist: "Queen",
     name: "Bohemian Rhapsody",
-    thumbnailUrl: "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png"
+    thumbnailUrl:
+      "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png",
   },
   {
     isSong: false,
     timeOfPlay: "13:40",
-    NewsContent: "Breaking news: sky is blue"
+    NewsContent: "Breaking news: sky is blue",
   },
   {
     isSong: true,
     timeOfPlay: "13:45",
     artist: "Led Zeppelin",
     name: "Stairway to Heaven",
-    thumbnailUrl: "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png"
-  }
+    thumbnailUrl:
+      "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png",
+  },
 ];
 
 export default function App() {
