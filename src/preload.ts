@@ -1,2 +1,20 @@
-// See the Electron documentation for details on how to use preload scripts:
-// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
+import { contextBridge, ipcRenderer } from "electron";
+
+export interface PlaylistItem {
+  ID: string;
+  name: string;
+  artist: string;
+  thumbnailUrl: string;
+  duration: string;
+}
+
+contextBridge.exposeInMainWorld("electronAPI", {
+  generatePlaylist: (prompt: string) =>
+    ipcRenderer.invoke("generate-playlist", prompt),
+  onPlaylistItem: (callback: (item: PlaylistItem) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, item: PlaylistItem) =>
+      callback(item);
+    ipcRenderer.on("playlist-item", handler);
+    return () => ipcRenderer.removeListener("playlist-item", handler);
+  },
+});

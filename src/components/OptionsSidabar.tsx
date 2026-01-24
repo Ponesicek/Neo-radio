@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -10,9 +11,16 @@ interface PlaylistRowData {
 
 interface OptionsSidebarProps {
   playlists: PlaylistRowData[];
+  onGenerate: (prompt: string) => void;
 }
 
-export function OptionsSidebar({ playlists }: OptionsSidebarProps) {
+export function OptionsSidebar({ playlists, onGenerate }: OptionsSidebarProps) {
+  const [prompt, setPrompt] = useState("");
+  const handleGenerate = async () => {
+    if (!prompt.trim()) return;
+    onGenerate(prompt);
+  };
+
   return (
     <div className="flex gap-2 flex-col items-center min-w-sm">
       <h2 className="text-xl">How are we feeling?</h2>
@@ -20,9 +28,11 @@ export function OptionsSidebar({ playlists }: OptionsSidebarProps) {
         id="textarea-message"
         placeholder="Type your message here."
         className="select-none"
+        onChange={(e) => setPrompt(e.target.value)}
+        value={prompt}
       />
       <div className="flex flex-row w-full justify-end">
-        <Button>Tune in</Button>
+        <Button onClick={handleGenerate}>Tune in</Button>
       </div>
       <div className="flex flex-row gap-2 w-full">
         <span className="min-w-fit">News frequency: </span>{" "}

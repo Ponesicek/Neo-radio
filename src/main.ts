@@ -1,7 +1,14 @@
-import { app, BrowserWindow, Menu } from "electron";
+import { app, BrowserWindow, Menu, ipcMain } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
-import YTMusic from "ytmusic-api";
+import { streamText, Output, stepCountIs } from "ai";
+import { openai } from "@ai-sdk/openai";
+import {
+  getCachedVideoDetails,
+  searchYoutube,
+  showNextForSongYoutube,
+} from "./tools";
+import { z } from "zod";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -56,5 +63,52 @@ app.on("activate", () => {
   }
 });
 
+ipcMain.removeHandler("generate-playlist");
+ipcMain.handle("generate-playlist", async (event, prompt: string) => {
+  const results: Array<{
+    ID: string;
+    name: string;
+    artist: string;
+    thumbnailUrl: string;
+    duration: string;
+  }> = [];
+  for await (const item of generatePlaylist(prompt)) {
+    results.push(item);
+    event.sender.send("playlist-item", item);
+  }
+  return results;
+});
+
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+export async function* generatePlaylist(prompt: string) {
+  const { elementStream } = streamText({
+    model: openai("gpt-5-nano"),
+    prompt: prompt,
+    output: Output.array({
+      element: z.object({
+        videoId: z
+          .string()
+          .describe(
+            "YouTube video ID (the 11-character ID from video URL, e.g. 'dQw4w9WgXcQ')",
+          ),
+      }),
+    }),
+    tools: {
+      searchYoutube,
+      showNextForSongYoutube,
+    },
+    stopWhen: stepCountIs(10),
+  });
+  for await (const element of elementStream) {
+    const details = await getCachedVideoDetails([element.videoId]);
+    const videoInfo = details.get(element.videoId);
+    yield {
+      ID: element.videoId,
+      name: videoInfo?.snippet?.title ?? "",
+      artist: videoInfo?.snippet?.channelTitle ?? "",
+      thumbnailUrl: videoInfo?.snippet?.thumbnails?.default?.url ?? "",
+      duration: videoInfo?.contentDetails?.duration ?? "",
+    };
+  }
+}

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   OptionsSidebar,
   type PlaylistRowData,
@@ -13,44 +14,38 @@ const samplePlaylists: PlaylistRowData[] = [
   { name: "Electronic" },
 ];
 
-const samplePlaylist: SongRowProps[] = [
-  {
-    isSong: true,
-    timeOfPlay: "13:30",
-    artist: "Beatles",
-    name: "Yesterday",
-    thumbnailUrl:
-      "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png",
-  },
-  {
-    isSong: true,
-    timeOfPlay: "13:34",
-    artist: "Queen",
-    name: "Bohemian Rhapsody",
-    thumbnailUrl:
-      "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png",
-  },
-  {
-    isSong: false,
-    timeOfPlay: "13:40",
-    NewsContent: "Breaking news: sky is blue",
-  },
-  {
-    isSong: true,
-    timeOfPlay: "13:45",
-    artist: "Led Zeppelin",
-    name: "Stairway to Heaven",
-    thumbnailUrl:
-      "https://mirrors.creativecommons.org/presskit/buttons/88x31/png/cc-zero.png",
-  },
-];
-
 export default function App() {
+  const [playlist, setPlaylist] = useState<SongRowProps[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onPlaylistItem((item) => {
+      setPlaylist((prev) => [
+        ...prev,
+        {
+          isSong: true,
+          timeOfPlay: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          artist: item.artist,
+          name: item.name,
+          thumbnailUrl: item.thumbnailUrl,
+        },
+      ]);
+    });
+    return unsubscribe;
+  }, []);
+
+  const handleGenerate = async (prompt: string) => {
+    setPlaylist([]);
+    await window.electronAPI.generatePlaylist(prompt);
+  };
+
   return (
     <div className="h-screen w-full bg-gray-100 flex p-4 gap-4">
-      <OptionsSidebar playlists={samplePlaylists} />
+      <OptionsSidebar playlists={samplePlaylists} onGenerate={handleGenerate} />
       <Separator orientation="vertical" />
-      <Playlist items={samplePlaylist} />
+      <Playlist items={playlist} />
     </div>
   );
 }
