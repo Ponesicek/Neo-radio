@@ -161,7 +161,7 @@ export function PlaybackBar({
   }, [song, canNext, onNext, onPlayPause, isPlaying]);
 
   return (
-    <div className="w-full border-t bg-white px-4 py-3 flex flex-row items-between justify-between">
+    <div className="w-full border-t bg-card px-4 py-3 flex flex-row items-between justify-between">
       <div className="flex items-center gap-3 w-150">
         <div className="flex items-center gap-3 w-fit">
           {song ? (
@@ -173,11 +173,11 @@ export function PlaybackBar({
               />
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">{song.name}</p>
-                <p className="text-xs text-gray-500 truncate">{song.artist}</p>
+                <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
               </div>
             </>
           ) : (
-            <p className="text-sm text-gray-500">No track loaded</p>
+            <p className="text-sm text-muted-foreground">No track loaded</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export function PlaybackBar({
         </div>
       </div>
       <div className="flex items-center gap-2 w-full max-w-xs">
-        <Volume2 className="text-gray-500" size={16} />
+        <Volume2 className="text-muted-foreground" size={16} />
         <Slider
           value={[volume]}
           onValueChange={(value) => setVolume(value[0] ?? volume)}

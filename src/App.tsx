@@ -111,7 +111,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-full bg-gray-100 flex flex-col">
+    <div className="h-screen w-full bg-background flex flex-col">
       <div className="flex flex-1 p-4 gap-4 overflow-hidden">
         <OptionsSidebar
           playlists={samplePlaylists}
