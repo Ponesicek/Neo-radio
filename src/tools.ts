@@ -3,12 +3,17 @@ import { z } from "zod";
 import Store from "electron-store";
 import { youtube } from "@googleapis/youtube";
 import { parseDuration, StoreSchema } from "./lib/utils";
+// Load environment variables first, before any other imports
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const store = new Store<StoreSchema>();
 
+const apiKey = process.env.YOUTUBE_API_KEY || store.get("youtubeApiKey");
+
 const youtubeClient = youtube({
   version: "v3",
-  auth: store.get("youtubeApiKey") || process.env.YOUTUBE_API_KEY,
+  auth: apiKey,
 });
 
 const videoCache = new Map<string, { data: any; timestamp: number }>();

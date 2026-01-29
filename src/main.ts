@@ -9,11 +9,13 @@ import {
   showNextForSongYoutube,
 } from "./tools";
 import { z } from "zod";
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+const openrouter = createOpenRouter()
 
 const createWindow = () => {
   // Create the browser window.
@@ -83,7 +85,7 @@ ipcMain.handle("generate-playlist", async (event, prompt: string) => {
 // code. You can also put them in separate files and import them here.
 export async function* generatePlaylist(prompt: string) {
   const { elementStream } = streamText({
-    model: openai("gpt-5-nano"),
+    model: openrouter("z-ai/glm-4.7"),
     prompt: prompt,
     output: Output.array({
       element: z.object({
@@ -103,6 +105,7 @@ export async function* generatePlaylist(prompt: string) {
   for await (const element of elementStream) {
     const details = await getCachedVideoDetails([element.videoId]);
     const videoInfo = details.get(element.videoId);
+    console.log(videoInfo)
     yield {
       ID: element.videoId,
       name: videoInfo?.snippet?.title ?? "",
