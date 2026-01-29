@@ -48,7 +48,7 @@ export function OptionsSidebar({
   };
 
   return (
-    <div className="flex gap-2 flex-col items-center min-w-sm">
+    <div className="flex gap-2 flex-col items-center w-[80%] min-w-3xs max-w-sm">
       <h2 className="text-xl">How are we feeling?</h2>
       <Textarea
         id="textarea-message"

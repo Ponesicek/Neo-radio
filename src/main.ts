@@ -85,8 +85,12 @@ ipcMain.handle("generate-playlist", async (event, prompt: string) => {
 // code. You can also put them in separate files and import them here.
 export async function* generatePlaylist(prompt: string) {
   const { elementStream } = streamText({
-    model: openrouter("z-ai/glm-4.7"),
+    system: "You are a helpful assistant that generates a playlist of YouTube videos based on a prompt. You will be given a prompt and you will need to generate a playlist of YouTube videos based on the prompt. You will need to use the searchYoutube tool to search for videos and the showNextForSongYoutube tool to show the next video in the playlist. Prefer to use the ID of the official youtube video, not any compilations or remixes unless the prompt specifically asks for it.",
+    model: openrouter("google/gemini-3-flash-preview"),
     prompt: prompt,
+    onChunk: (chunk) => {
+      console.log(chunk);
+    },
     output: Output.array({
       element: z.object({
         videoId: z
@@ -100,7 +104,7 @@ export async function* generatePlaylist(prompt: string) {
       searchYoutube,
       showNextForSongYoutube,
     },
-    stopWhen: stepCountIs(10),
+    stopWhen: stepCountIs(20),
   });
   for await (const element of elementStream) {
     const details = await getCachedVideoDetails([element.videoId]);

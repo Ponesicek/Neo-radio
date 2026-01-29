@@ -31,6 +31,37 @@ function buildEmbedUrl(videoId: string) {
   return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 }
 
+function parseMessageData(data: unknown) {
+  if (!data) return null;
+  if (typeof data !== "string") return data;
+  try {
+    return JSON.parse(data) as unknown;
+  } catch {
+    return data;
+  }
+}
+
+function getPlayerState(data: unknown) {
+  const parsed = parseMessageData(data) as
+    | { event?: string; info?: unknown }
+    | null;
+
+  if (!parsed) return null;
+  if (parsed.event === "onStateChange" && typeof parsed.info === "number") {
+    return parsed.info;
+  }
+  if (
+    parsed.event === "infoDelivery" &&
+    typeof parsed.info === "object" &&
+    parsed.info !== null &&
+    "playerState" in parsed.info &&
+    typeof (parsed.info as { playerState?: number }).playerState === "number"
+  ) {
+    return (parsed.info as { playerState?: number }).playerState ?? null;
+  }
+  return null;
+}
+
 export function PlaybackBar({
   song,
   isPlaying,
@@ -41,6 +72,7 @@ export function PlaybackBar({
   canPrev,
 }: PlaybackBarProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const handledEndRef = useRef<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [volume, setVolume] = useState(70);
 
@@ -53,6 +85,14 @@ export function PlaybackBar({
     if (!playerReady || !iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage(
       JSON.stringify({ event: "command", func, args }),
+      "*",
+    );
+  };
+
+  const sendListening = () => {
+    if (!iframeRef.current?.contentWindow) return;
+    iframeRef.current.contentWindow.postMessage(
+      JSON.stringify({ event: "listening" }),
       "*",
     );
   };
@@ -80,64 +120,104 @@ export function PlaybackBar({
     setPlayerReady(false);
   }, [song?.videoId]);
 
+  useEffect(() => {
+    handledEndRef.current = null;
+  }, [song?.videoId]);
+
+  useEffect(() => {
+    if (!playerReady) return;
+    sendListening();
+  }, [playerReady, song?.videoId]);
+
+  useEffect(() => {
+    if (!song) return;
+    const handleMessage = (event: MessageEvent) => {
+      const parsedEvent = parseMessageData(event.data);
+      const isPlayerMessage =
+        !!iframeRef.current?.contentWindow &&
+        event.source === iframeRef.current.contentWindow;
+      if (!isPlayerMessage) return;
+
+      const state = getPlayerState(event.data);
+      if (state !== 0) return;
+
+      if (handledEndRef.current === song.videoId) return;
+      handledEndRef.current = song.videoId;
+
+      if (canNext) {
+        onNext();
+        return;
+      }
+
+      if (isPlaying) {
+        onPlayPause();
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [song, canNext, onNext, onPlayPause, isPlaying]);
+
   return (
-    <div className="w-full border-t bg-white px-4 py-3 flex items-center gap-4">
-      <div className="flex items-center gap-3 w-64">
-        {song ? (
-          <>
-            <img
-              src={song.thumbnailUrl}
-              alt={`${song.name} cover`}
-              className="h-10 w-16 object-cover rounded-sm"
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">{song.name}</p>
-              <p className="text-xs text-gray-500 truncate">{song.artist}</p>
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-gray-500">No track loaded</p>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onPrev}
-          disabled={!canPrev}
-          aria-label="Previous track"
-        >
-          <SkipBack />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onPlayPause}
-          disabled={!song}
-          aria-label={isPlaying ? "Pause" : "Play"}
-        >
-          {isPlaying ? <Pause /> : <Play />}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onNext}
-          disabled={!canNext}
-          aria-label="Next track"
-        >
-          <SkipForward />
-        </Button>
-      </div>
-      <div className="flex items-center gap-3 flex-1">
-        <div className="flex items-center gap-2 w-full max-w-xs">
-          <Volume2 className="text-gray-500" size={16} />
-          <Slider
-            value={[volume]}
-            onValueChange={(value) => setVolume(value[0] ?? volume)}
-            min={0}
-            max={100}
-          />
+    <div className="w-full border-t bg-white px-4 py-3 flex flex-row items-between justify-between">
+      <div className="flex items-center gap-3 w-150">
+        <div className="flex items-center gap-3 w-fit">
+          {song ? (
+            <>
+              <img
+                src={song.thumbnailUrl}
+                alt={`${song.name} cover`}
+                className="h-10 w-16 object-cover rounded-sm"
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">{song.name}</p>
+                <p className="text-xs text-gray-500 truncate">{song.artist}</p>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">No track loaded</p>
+          )}
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onPrev}
+            disabled={!canPrev}
+            aria-label="Previous track"
+          >
+            <SkipBack />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onPlayPause}
+            disabled={!song}
+            aria-label={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? <Pause /> : <Play />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onNext}
+            disabled={!canNext}
+            aria-label="Next track"
+          >
+            <SkipForward />
+          </Button>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 w-full max-w-xs">
+        <Volume2 className="text-gray-500" size={16} />
+        <Slider
+          value={[volume]}
+          onValueChange={(value) => setVolume(value[0] ?? volume)}
+          min={0}
+          max={100}
+        />
       </div>
       {song ? (
         <iframe
@@ -145,7 +225,10 @@ export function PlaybackBar({
           title="Playback"
           src={embedSrc}
           allow="autoplay; encrypted-media"
-          onLoad={() => setPlayerReady(true)}
+          onLoad={() => {
+            setPlayerReady(true);
+            sendListening();
+          }}
           className="absolute h-0 w-0 opacity-0 pointer-events-none"
         />
       ) : null}
