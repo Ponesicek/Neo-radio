@@ -3,17 +3,18 @@ import { ThumbsUp, Trash2, ThumbsDown } from "lucide-react";
 
 type SongRowProps =
   | {
-      isSong: true;
-      timeOfPlay: string;
-      thumbnailUrl: string;
-      name: string;
-      artist: string;
-    }
+    isSong: true;
+    timeOfPlay: string;
+    thumbnailUrl: string;
+    name: string;
+    artist: string;
+    videoId: string;
+  }
   | {
-      isSong: false;
-      timeOfPlay: string;
-      NewsContent: string;
-    };
+    isSong: false;
+    timeOfPlay: string;
+    NewsContent: string;
+  };
 
 interface PlaylistProps {
   items: SongRowProps[];
