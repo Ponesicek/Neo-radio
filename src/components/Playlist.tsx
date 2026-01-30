@@ -1,4 +1,5 @@
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { ThumbsUp, Trash2, ThumbsDown } from "lucide-react";
 
 type SongRowProps =
@@ -9,39 +10,57 @@ type SongRowProps =
     name: string;
     artist: string;
     videoId: string;
+    durationSeconds: number;
   }
   | {
     isSong: false;
     timeOfPlay: string;
     NewsContent: string;
+    durationSeconds?: number;
   };
 
 interface PlaylistProps {
   items: SongRowProps[];
+  activeVideoId?: string | null;
 }
 
-function Playlist({ items }: PlaylistProps) {
+type SongRowDisplayProps = SongRowProps & {
+  isActive?: boolean;
+};
+
+function Playlist({ items, activeVideoId }: PlaylistProps) {
   return (
     <Table>
       <TableBody>
         {items.map((item, index) => (
-          <SongRow key={index} {...item} />
+          <SongRow
+            key={index}
+            {...item}
+            isActive={item.isSong && item.videoId === activeVideoId}
+          />
         ))}
       </TableBody>
     </Table>
   );
 }
 
-function SongRow(props: SongRowProps) {
+function SongRow(props: SongRowDisplayProps) {
   if (props.isSong) {
     return (
-      <TableRow className="flex flex-row w-full justify-between h-16">
+      <TableRow
+        className={cn(
+          "flex flex-row w-full justify-between h-16 items-center",
+          props.isActive && "bg-muted/70",
+        )}
+        data-state={props.isActive ? "selected" : undefined}
+        aria-current={props.isActive ? "true" : undefined}
+      >
         <TableCell>
           <div className="flex items-center gap-4">
             <span>{props.timeOfPlay}</span>
             <img
               src={props.thumbnailUrl}
-              style={{ height: "40px", width: "71px", objectFit: "fill" }}
+              style={{ height: "40px", minWidth: "71px", maxWidth: "71px", objectFit: "fill" }}
             />
             <div className="flex flex-col">
               <p className="font-bold">{props.name}</p>
