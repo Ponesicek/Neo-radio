@@ -6,6 +6,7 @@ import { Separator } from "./components/ui/separator";
 import { Playlist } from "./components/Playlist";
 import { PlaybackBar } from "./components/PlaybackBar";
 import { usePlaybackControl } from "./hooks/usePlaybackControl";
+import { useMemo } from "react";
 import { usePlaylist } from "./hooks/usePlaylist";
 import { usePlaylistGeneration } from "./hooks/usePlaylistGeneration";
 
@@ -21,6 +22,7 @@ export default function App() {
   const { playlist, songs, resetPlaylist } = usePlaylist();
   const {
     currentSong,
+    currentIndex,
     isPlaying,
     canNext,
     canPrev,
@@ -36,6 +38,12 @@ export default function App() {
   });
   const activeVideoId =
     isPlaying && currentSong ? currentSong.videoId : null;
+  const upcomingVideoIds = useMemo(() => {
+    if (currentIndex === null) return [];
+    return songs
+      .slice(currentIndex + 1, currentIndex + 6)
+      .map((item) => item.videoId);
+  }, [songs, currentIndex]);
 
   return (
     <div className="h-screen w-full bg-background flex flex-col">
@@ -54,6 +62,7 @@ export default function App() {
       </div>
       <PlaybackBar
         song={currentSong}
+        upcomingVideoIds={upcomingVideoIds}
         isPlaying={isPlaying}
         onPlayPause={playPause}
         onNext={next}

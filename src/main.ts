@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, ipcMain } from "electron";
+import fs from "node:fs/promises";
 import path from "node:path";
 import started from "electron-squirrel-startup";
 import { streamText, Output, stepCountIs } from "ai";
@@ -9,6 +10,7 @@ import {
 } from "./tools";
 import { z } from "zod";
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { ensureAudioFile } from "./audioDownload";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -79,6 +81,42 @@ ipcMain.handle("generate-playlist", async (event, prompt: string) => {
   }
   return results;
 });
+
+ipcMain.removeHandler("ensure-audio");
+ipcMain.handle("ensure-audio", async (_event, videoId: string) => {
+  const audioPath = await ensureAudioFile(videoId);
+  const data = await fs.readFile(audioPath);
+  const buffer = data.buffer.slice(
+    data.byteOffset,
+    data.byteOffset + data.byteLength,
+  );
+  const mimeType = getAudioMimeType(audioPath);
+  return { data: buffer, mimeType };
+});
+
+ipcMain.removeHandler("preload-audio");
+ipcMain.handle("preload-audio", async (_event, videoId: string) => {
+  await ensureAudioFile(videoId);
+});
+
+function getAudioMimeType(filePath: string): string {
+  switch (path.extname(filePath).toLowerCase()) {
+    case ".mp3":
+      return "audio/mpeg";
+    case ".m4a":
+    case ".mp4":
+      return "audio/mp4";
+    case ".webm":
+      return "audio/webm";
+    case ".opus":
+    case ".ogg":
+      return "audio/ogg";
+    case ".wav":
+      return "audio/wav";
+    default:
+      return "application/octet-stream";
+  }
+}
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.

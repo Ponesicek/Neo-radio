@@ -11,6 +11,8 @@ export interface PlaylistItem {
 contextBridge.exposeInMainWorld("electronAPI", {
   generatePlaylist: (prompt: string) =>
     ipcRenderer.invoke("generate-playlist", prompt),
+  ensureAudio: (videoId: string) => ipcRenderer.invoke("ensure-audio", videoId),
+  preloadAudio: (videoId: string) => ipcRenderer.invoke("preload-audio", videoId),
   onPlaylistItem: (callback: (item: PlaylistItem) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, item: PlaylistItem) =>
       callback(item);

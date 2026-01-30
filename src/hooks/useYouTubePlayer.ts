@@ -1,195 +1,166 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface YouTubePlayerOptions {
   videoId: string | null;
+  upcomingVideoIds?: string[];
   isPlaying: boolean;
   canNext: boolean;
   onNext: () => void;
   onPlayPause: () => void;
 }
 
-function buildEmbedUrl(videoId: string) {
-  const params = new URLSearchParams({
-    autoplay: "1",
-    controls: "0",
-    enablejsapi: "1",
-    rel: "0",
-    playsinline: "1",
-    modestbranding: "1",
-  });
-  if (window.location.origin && window.location.origin !== "null") {
-    params.set("origin", window.location.origin);
-  }
-  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
-}
-
-function parseMessageData(data: unknown) {
-  if (!data) return null;
-  if (typeof data !== "string") return data;
-  try {
-    return JSON.parse(data) as unknown;
-  } catch {
-    return data;
-  }
-}
-
-function getPlayerState(data: unknown) {
-  const parsed = parseMessageData(data) as
-    | { event?: string; info?: unknown }
-    | null;
-
-  if (!parsed) return null;
-  if (parsed.event === "onStateChange" && typeof parsed.info === "number") {
-    return parsed.info;
-  }
-  if (
-    parsed.event === "infoDelivery" &&
-    typeof parsed.info === "object" &&
-    parsed.info !== null &&
-    "playerState" in parsed.info &&
-    typeof (parsed.info as { playerState?: number }).playerState === "number"
-  ) {
-    return (parsed.info as { playerState?: number }).playerState ?? null;
-  }
-  return null;
-}
-
-function getInfoDelivery(data: unknown) {
-  const parsed = parseMessageData(data) as
-    | { event?: string; info?: unknown }
-    | null;
-
-  if (!parsed) return null;
-  if (
-    parsed.event !== "infoDelivery" ||
-    typeof parsed.info !== "object" ||
-    parsed.info === null
-  ) {
-    return null;
-  }
-  return parsed.info as Record<string, unknown>;
-}
-
 export function useYouTubePlayer({
   videoId,
+  upcomingVideoIds,
   isPlaying,
   canNext,
   onNext,
   onPlayPause,
 }: YouTubePlayerOptions) {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const handledEndRef = useRef<string | null>(null);
-  const [playerReady, setPlayerReady] = useState(false);
+  const requestIdRef = useRef(0);
+  const isSeekingRef = useRef(false);
+  const objectUrlRef = useRef<string | null>(null);
+
+  const [audioSrc, setAudioSrc] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [volume, setVolume] = useState(70);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
 
-  const embedSrc = useMemo(() => {
-    if (!videoId) return "";
-    return buildEmbedUrl(videoId);
-  }, [videoId]);
-
-  const postCommand = useCallback(
-    (func: string, args: unknown[] = []) => {
-      if (!playerReady || !iframeRef.current?.contentWindow) return;
-      iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: "command", func, args }),
-        "*",
-      );
-    },
-    [playerReady],
-  );
-
-  const sendListening = useCallback(() => {
-    if (!iframeRef.current?.contentWindow) return;
-    iframeRef.current.contentWindow.postMessage(
-      JSON.stringify({ event: "listening" }),
-      "*",
-    );
-  }, []);
-
-  const handleIframeLoad = useCallback(() => {
-    setPlayerReady(true);
-    sendListening();
-  }, [sendListening]);
-
   useEffect(() => {
-    if (!videoId) return;
-    if (isPlaying) {
-      postCommand("playVideo");
-    } else {
-      postCommand("pauseVideo");
-    }
-  }, [isPlaying, videoId, playerReady, postCommand]);
-
-  useEffect(() => {
-    if (!videoId) return;
-    postCommand("setVolume", [volume]);
-    if (volume > 0) {
-      postCommand("unMute");
-    } else {
-      postCommand("mute");
-    }
-  }, [volume, videoId, playerReady, postCommand]);
-
-  useEffect(() => {
-    setPlayerReady(false);
-    setCurrentTime(0);
-    setDuration(0);
-    setSeekValue(0);
-    setIsSeeking(false);
-  }, [videoId]);
+    isSeekingRef.current = isSeeking;
+  }, [isSeeking]);
 
   useEffect(() => {
     handledEndRef.current = null;
   }, [videoId]);
 
   useEffect(() => {
-    if (!playerReady) return;
-    sendListening();
-  }, [playerReady, videoId, sendListening]);
+    setAudioSrc("");
+    setCurrentTime(0);
+    setDuration(0);
+    setSeekValue(0);
+    setIsSeeking(false);
+    setIsLoading(!!videoId);
 
-  useEffect(() => {
-    if (!playerReady || !videoId) return;
-    const intervalId = window.setInterval(() => {
-      postCommand("getCurrentTime");
-      postCommand("getDuration");
-    }, 1000);
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+
+    if (!videoId) return;
+
+    const requestId = ++requestIdRef.current;
+    let cancelled = false;
+
+    window.electronAPI
+      .ensureAudio(videoId)
+      .then(({ data, mimeType }) => {
+        const blob = new Blob([data as ArrayBuffer], {
+          type: mimeType || "application/octet-stream",
+        });
+        const objectUrl = URL.createObjectURL(blob);
+        if (cancelled || requestId !== requestIdRef.current) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+        }
+        objectUrlRef.current = objectUrl;
+        setAudioSrc(objectUrl);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Failed to load audio", error);
+        setIsLoading(false);
+      });
 
     return () => {
-      window.clearInterval(intervalId);
+      cancelled = true;
     };
-  }, [playerReady, videoId, postCommand]);
+  }, [videoId]);
 
   useEffect(() => {
-    if (!isSeeking) {
-      setSeekValue(currentTime);
-    }
-  }, [currentTime, isSeeking]);
+    if (!upcomingVideoIds || upcomingVideoIds.length === 0) return;
+    const uniqueIds = Array.from(new Set(upcomingVideoIds)).slice(0, 5);
+    uniqueIds.forEach((id) => {
+      if (!id || id === videoId) return;
+      window.electronAPI.preloadAudio(id).catch(() => {});
+    });
+  }, [upcomingVideoIds, videoId]);
 
   useEffect(() => {
-    if (!videoId) return;
-    const handleMessage = (event: MessageEvent) => {
-      const isPlayerMessage =
-        !!iframeRef.current?.contentWindow &&
-        event.source === iframeRef.current.contentWindow;
-      if (!isPlayerMessage) return;
-
-      const info = getInfoDelivery(event.data);
-      if (info) {
-        if (typeof info.duration === "number" && info.duration > 0) {
-          setDuration(info.duration);
-        }
-        if (typeof info.currentTime === "number" && !isSeeking) {
-          setCurrentTime(info.currentTime);
-        }
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
       }
+    };
+  }, []);
 
-      const state = getPlayerState(event.data);
-      if (state !== 0) return;
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
+    audio.pause();
+    audio.currentTime = 0;
+
+    if (!audioSrc) {
+      return;
+    }
+
+    audio.load();
+  }, [audioSrc]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !audioSrc) return;
+
+    if (isPlaying) {
+      const playPromise = audio.play();
+      if (playPromise) {
+        playPromise.catch((error) => {
+          console.warn("Audio playback failed", error);
+        });
+      }
+      return;
+    }
+
+    audio.pause();
+  }, [isPlaying, audioSrc]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const normalizedVolume = Math.min(1, Math.max(0, volume / 100));
+    audio.volume = normalizedVolume;
+    audio.muted = normalizedVolume === 0;
+  }, [volume]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !audioSrc) return;
+
+    const handleLoadedMetadata = () => {
+      const nextDuration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      if (nextDuration > 0) {
+        setDuration(nextDuration);
+      }
+      setIsLoading(false);
+    };
+
+    const handleTimeUpdate = () => {
+      if (!isSeekingRef.current) {
+        setCurrentTime(audio.currentTime);
+      }
+    };
+
+    const handleEnded = () => {
       if (handledEndRef.current === videoId) return;
       handledEndRef.current = videoId;
 
@@ -203,11 +174,33 @@ export function useYouTubePlayer({
       }
     };
 
-    window.addEventListener("message", handleMessage);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("durationchange", handleLoadedMetadata);
+    audio.addEventListener("canplay", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      setDuration(audio.duration);
+    }
+    if (!isSeekingRef.current) {
+      setCurrentTime(audio.currentTime);
+    }
+
     return () => {
-      window.removeEventListener("message", handleMessage);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("durationchange", handleLoadedMetadata);
+      audio.removeEventListener("canplay", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
     };
-  }, [videoId, canNext, onNext, onPlayPause, isPlaying, isSeeking]);
+  }, [audioSrc, videoId, canNext, onNext, onPlayPause, isPlaying]);
+
+  useEffect(() => {
+    if (!isSeeking) {
+      setSeekValue(currentTime);
+    }
+  }, [currentTime, isSeeking]);
 
   const onSeekValueChange = useCallback(
     (value: number[]) => {
@@ -225,9 +218,12 @@ export function useYouTubePlayer({
       setIsSeeking(false);
       setSeekValue(nextValue);
       setCurrentTime(nextValue);
-      postCommand("seekTo", [nextValue, true]);
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = nextValue;
+      }
     },
-    [duration, postCommand],
+    [duration],
   );
 
   const hasDuration = duration > 0;
@@ -235,8 +231,9 @@ export function useYouTubePlayer({
   const timelineValue = hasDuration ? Math.min(displayTime, duration) : 0;
 
   return {
-    iframeRef,
-    embedSrc,
+    audioRef,
+    audioSrc,
+    isLoading,
     volume,
     setVolume,
     duration,
@@ -245,6 +242,5 @@ export function useYouTubePlayer({
     timelineValue,
     onSeekValueChange,
     onSeekCommit,
-    onIframeLoad: handleIframeLoad,
   };
 }

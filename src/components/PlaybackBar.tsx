@@ -2,12 +2,13 @@ import { Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
 import type { SongRowProps } from "./Playlist";
-import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
+import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
 
 type PlaybackSong = Extract<SongRowProps, { isSong: true }>;
 
 interface PlaybackBarProps {
   song: PlaybackSong | null;
+  upcomingVideoIds?: string[];
   isPlaying: boolean;
   onPlayPause: () => void;
   onNext: () => void;
@@ -34,6 +35,7 @@ function formatTime(value: number) {
 
 export function PlaybackBar({
   song,
+  upcomingVideoIds,
   isPlaying,
   onPlayPause,
   onNext,
@@ -42,8 +44,9 @@ export function PlaybackBar({
   canPrev,
 }: PlaybackBarProps) {
   const {
-    iframeRef,
-    embedSrc,
+    audioRef,
+    audioSrc,
+    isLoading,
     volume,
     setVolume,
     duration,
@@ -51,9 +54,9 @@ export function PlaybackBar({
     timelineValue,
     onSeekValueChange,
     onSeekCommit,
-    onIframeLoad,
   } = useYouTubePlayer({
     videoId: song?.videoId ?? null,
+    upcomingVideoIds,
     isPlaying,
     canNext,
     onNext,
@@ -122,7 +125,7 @@ export function PlaybackBar({
             min={0}
             max={hasDuration ? duration : 1}
             step={1}
-            disabled={!song || !hasDuration}
+            disabled={!song || !hasDuration || isLoading}
             aria-label="Song timeline"
           />
           <span className="text-xs tabular-nums text-muted-foreground w-12">
@@ -139,13 +142,11 @@ export function PlaybackBar({
           max={100}
         />
       </div>
-      {song ? (
-        <iframe
-          ref={iframeRef}
-          title="Playback"
-          src={embedSrc}
-          allow="autoplay; encrypted-media"
-          onLoad={onIframeLoad}
+      {song && audioSrc ? (
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          preload="metadata"
           className="absolute h-0 w-0 opacity-0 pointer-events-none"
         />
       ) : null}
