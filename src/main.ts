@@ -2,7 +2,6 @@ import { app, BrowserWindow, Menu, ipcMain } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
 import { streamText, Output, stepCountIs } from "ai";
-import { openai } from "@ai-sdk/openai";
 import {
   getCachedVideoDetails,
   searchYoutube,

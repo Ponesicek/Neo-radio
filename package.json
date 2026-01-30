@@ -60,6 +60,7 @@
     "dotenv": "^17.2.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^8.2.0",
+    "feedsmith": "^2.9.0",
     "lucide-react": "^0.563.0",
     "openai": "^6.16.0",
     "react": "^19.2.3",

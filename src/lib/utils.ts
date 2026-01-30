@@ -21,6 +21,12 @@ export interface StoreSchema {
         default: "kokoro";
       };
     };
+    providers: {
+      rss: {
+        type: "Array<string>";
+        default: ["https://news.ycombinator.com/rss"];
+      }
+    };
   };
   youtubeApiKey: string;
 }
