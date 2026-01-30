@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
 import type { SongRowProps } from "./Playlist";
+import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
 
 type PlaybackSong = Extract<SongRowProps, { isSong: true }>;
 
@@ -14,68 +14,6 @@ interface PlaybackBarProps {
   onPrev: () => void;
   canNext: boolean;
   canPrev: boolean;
-}
-
-function buildEmbedUrl(videoId: string) {
-  const params = new URLSearchParams({
-    autoplay: "1",
-    controls: "0",
-    enablejsapi: "1",
-    rel: "0",
-    playsinline: "1",
-    modestbranding: "1",
-  });
-  if (window.location.origin && window.location.origin !== "null") {
-    params.set("origin", window.location.origin);
-  }
-  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
-}
-
-function parseMessageData(data: unknown) {
-  if (!data) return null;
-  if (typeof data !== "string") return data;
-  try {
-    return JSON.parse(data) as unknown;
-  } catch {
-    return data;
-  }
-}
-
-function getPlayerState(data: unknown) {
-  const parsed = parseMessageData(data) as
-    | { event?: string; info?: unknown }
-    | null;
-
-  if (!parsed) return null;
-  if (parsed.event === "onStateChange" && typeof parsed.info === "number") {
-    return parsed.info;
-  }
-  if (
-    parsed.event === "infoDelivery" &&
-    typeof parsed.info === "object" &&
-    parsed.info !== null &&
-    "playerState" in parsed.info &&
-    typeof (parsed.info as { playerState?: number }).playerState === "number"
-  ) {
-    return (parsed.info as { playerState?: number }).playerState ?? null;
-  }
-  return null;
-}
-
-function getInfoDelivery(data: unknown) {
-  const parsed = parseMessageData(data) as
-    | { event?: string; info?: unknown }
-    | null;
-
-  if (!parsed) return null;
-  if (
-    parsed.event !== "infoDelivery" ||
-    typeof parsed.info !== "object" ||
-    parsed.info === null
-  ) {
-    return null;
-  }
-  return parsed.info as Record<string, unknown>;
 }
 
 function formatTime(value: number) {
@@ -103,138 +41,24 @@ export function PlaybackBar({
   canNext,
   canPrev,
 }: PlaybackBarProps) {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const handledEndRef = useRef<string | null>(null);
-  const [playerReady, setPlayerReady] = useState(false);
-  const [volume, setVolume] = useState(70);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isSeeking, setIsSeeking] = useState(false);
-  const [seekValue, setSeekValue] = useState(0);
-
-  const embedSrc = useMemo(() => {
-    if (!song) return "";
-    return buildEmbedUrl(song.videoId);
-  }, [song?.videoId]);
-
-  const postCommand = useCallback(
-    (func: string, args: unknown[] = []) => {
-      if (!playerReady || !iframeRef.current?.contentWindow) return;
-      iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: "command", func, args }),
-        "*",
-      );
-    },
-    [playerReady],
-  );
-
-  const sendListening = () => {
-    if (!iframeRef.current?.contentWindow) return;
-    iframeRef.current.contentWindow.postMessage(
-      JSON.stringify({ event: "listening" }),
-      "*",
-    );
-  };
-
-  useEffect(() => {
-    if (!song) return;
-    if (isPlaying) {
-      postCommand("playVideo");
-    } else {
-      postCommand("pauseVideo");
-    }
-  }, [isPlaying, song?.videoId, playerReady, postCommand]);
-
-  useEffect(() => {
-    if (!song) return;
-    postCommand("setVolume", [volume]);
-    if (volume > 0) {
-      postCommand("unMute");
-    } else {
-      postCommand("mute");
-    }
-  }, [volume, song?.videoId, playerReady, postCommand]);
-
-  useEffect(() => {
-    setPlayerReady(false);
-    setCurrentTime(0);
-    setDuration(0);
-    setSeekValue(0);
-    setIsSeeking(false);
-  }, [song?.videoId]);
-
-  useEffect(() => {
-    handledEndRef.current = null;
-  }, [song?.videoId]);
-
-  useEffect(() => {
-    if (!playerReady) return;
-    sendListening();
-  }, [playerReady, song?.videoId]);
-
-  useEffect(() => {
-    if (!playerReady || !song) return;
-    const intervalId = window.setInterval(() => {
-      postCommand("getCurrentTime");
-      postCommand("getDuration");
-    }, 1000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [playerReady, song?.videoId, postCommand]);
-
-  useEffect(() => {
-    if (!isSeeking) {
-      setSeekValue(currentTime);
-    }
-  }, [currentTime, isSeeking]);
-
-  useEffect(() => {
-    if (!song) return;
-    const handleMessage = (event: MessageEvent) => {
-      const isPlayerMessage =
-        !!iframeRef.current?.contentWindow &&
-        event.source === iframeRef.current.contentWindow;
-      if (!isPlayerMessage) return;
-
-      const info = getInfoDelivery(event.data);
-      if (info) {
-        if (typeof info.duration === "number" && info.duration > 0) {
-          setDuration(info.duration);
-        }
-        if (typeof info.currentTime === "number" && !isSeeking) {
-          setCurrentTime(info.currentTime);
-        }
-      }
-
-      const state = getPlayerState(event.data);
-      if (state !== 0) return;
-
-      if (handledEndRef.current === song.videoId) return;
-      handledEndRef.current = song.videoId;
-
-      if (canNext) {
-        onNext();
-        return;
-      }
-
-      if (isPlaying) {
-        onPlayPause();
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => {
-      window.removeEventListener("message", handleMessage);
-    };
-  }, [song, canNext, onNext, onPlayPause, isPlaying, isSeeking]);
-
-  const hasDuration = duration > 0;
-  const displayTime = isSeeking ? seekValue : currentTime;
-  const timelineValue = hasDuration
-    ? Math.min(displayTime, duration)
-    : 0;
+  const {
+    iframeRef,
+    embedSrc,
+    volume,
+    setVolume,
+    duration,
+    hasDuration,
+    timelineValue,
+    onSeekValueChange,
+    onSeekCommit,
+    onIframeLoad,
+  } = useYouTubePlayer({
+    videoId: song?.videoId ?? null,
+    isPlaying,
+    canNext,
+    onNext,
+    onPlayPause,
+  });
 
   return (
     <div className="w-full border-t bg-card px-4 py-3 flex flex-row items-between justify-between">
@@ -293,19 +117,8 @@ export function PlaybackBar({
           </span>
           <Slider
             value={[timelineValue]}
-            onValueChange={(value) => {
-              if (!hasDuration) return;
-              setIsSeeking(true);
-              setSeekValue(value[0] ?? 0);
-            }}
-            onValueCommit={(value) => {
-              if (!hasDuration) return;
-              const nextValue = value[0] ?? 0;
-              setIsSeeking(false);
-              setSeekValue(nextValue);
-              setCurrentTime(nextValue);
-              postCommand("seekTo", [nextValue, true]);
-            }}
+            onValueChange={onSeekValueChange}
+            onValueCommit={onSeekCommit}
             min={0}
             max={hasDuration ? duration : 1}
             step={1}
@@ -332,10 +145,7 @@ export function PlaybackBar({
           title="Playback"
           src={embedSrc}
           allow="autoplay; encrypted-media"
-          onLoad={() => {
-            setPlayerReady(true);
-            sendListening();
-          }}
+          onLoad={onIframeLoad}
           className="absolute h-0 w-0 opacity-0 pointer-events-none"
         />
       ) : null}
