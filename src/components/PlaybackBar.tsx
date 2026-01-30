@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
@@ -62,6 +62,38 @@ function getPlayerState(data: unknown) {
   return null;
 }
 
+function getInfoDelivery(data: unknown) {
+  const parsed = parseMessageData(data) as
+    | { event?: string; info?: unknown }
+    | null;
+
+  if (!parsed) return null;
+  if (
+    parsed.event !== "infoDelivery" ||
+    typeof parsed.info !== "object" ||
+    parsed.info === null
+  ) {
+    return null;
+  }
+  return parsed.info as Record<string, unknown>;
+}
+
+function formatTime(value: number) {
+  if (!Number.isFinite(value) || value < 0) return "0:00";
+  const totalSeconds = Math.floor(value);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+      2,
+      "0",
+    )}`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function PlaybackBar({
   song,
   isPlaying,
@@ -75,19 +107,26 @@ export function PlaybackBar({
   const handledEndRef = useRef<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [volume, setVolume] = useState(70);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekValue, setSeekValue] = useState(0);
 
   const embedSrc = useMemo(() => {
     if (!song) return "";
     return buildEmbedUrl(song.videoId);
   }, [song?.videoId]);
 
-  const postCommand = (func: string, args: unknown[] = []) => {
-    if (!playerReady || !iframeRef.current?.contentWindow) return;
-    iframeRef.current.contentWindow.postMessage(
-      JSON.stringify({ event: "command", func, args }),
-      "*",
-    );
-  };
+  const postCommand = useCallback(
+    (func: string, args: unknown[] = []) => {
+      if (!playerReady || !iframeRef.current?.contentWindow) return;
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: "command", func, args }),
+        "*",
+      );
+    },
+    [playerReady],
+  );
 
   const sendListening = () => {
     if (!iframeRef.current?.contentWindow) return;
@@ -104,7 +143,7 @@ export function PlaybackBar({
     } else {
       postCommand("pauseVideo");
     }
-  }, [isPlaying, song?.videoId, playerReady]);
+  }, [isPlaying, song?.videoId, playerReady, postCommand]);
 
   useEffect(() => {
     if (!song) return;
@@ -114,10 +153,14 @@ export function PlaybackBar({
     } else {
       postCommand("mute");
     }
-  }, [volume, song?.videoId, playerReady]);
+  }, [volume, song?.videoId, playerReady, postCommand]);
 
   useEffect(() => {
     setPlayerReady(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setSeekValue(0);
+    setIsSeeking(false);
   }, [song?.videoId]);
 
   useEffect(() => {
@@ -130,13 +173,40 @@ export function PlaybackBar({
   }, [playerReady, song?.videoId]);
 
   useEffect(() => {
+    if (!playerReady || !song) return;
+    const intervalId = window.setInterval(() => {
+      postCommand("getCurrentTime");
+      postCommand("getDuration");
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [playerReady, song?.videoId, postCommand]);
+
+  useEffect(() => {
+    if (!isSeeking) {
+      setSeekValue(currentTime);
+    }
+  }, [currentTime, isSeeking]);
+
+  useEffect(() => {
     if (!song) return;
     const handleMessage = (event: MessageEvent) => {
-      const parsedEvent = parseMessageData(event.data);
       const isPlayerMessage =
         !!iframeRef.current?.contentWindow &&
         event.source === iframeRef.current.contentWindow;
       if (!isPlayerMessage) return;
+
+      const info = getInfoDelivery(event.data);
+      if (info) {
+        if (typeof info.duration === "number" && info.duration > 0) {
+          setDuration(info.duration);
+        }
+        if (typeof info.currentTime === "number" && !isSeeking) {
+          setCurrentTime(info.currentTime);
+        }
+      }
 
       const state = getPlayerState(event.data);
       if (state !== 0) return;
@@ -158,11 +228,17 @@ export function PlaybackBar({
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [song, canNext, onNext, onPlayPause, isPlaying]);
+  }, [song, canNext, onNext, onPlayPause, isPlaying, isSeeking]);
+
+  const hasDuration = duration > 0;
+  const displayTime = isSeeking ? seekValue : currentTime;
+  const timelineValue = hasDuration
+    ? Math.min(displayTime, duration)
+    : 0;
 
   return (
     <div className="w-full border-t bg-card px-4 py-3 flex flex-row items-between justify-between">
-      <div className="flex items-center gap-3 w-150">
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-3 w-fit">
           {song ? (
             <>
@@ -208,6 +284,37 @@ export function PlaybackBar({
           >
             <SkipForward />
           </Button>
+        </div>
+      </div>
+      <div className="flex flex-1 px-4 items-center justify-center">
+        <div className="flex w-full gap-2">
+          <span className="text-xs tabular-nums text-muted-foreground w-12 text-right">
+            {formatTime(timelineValue)}
+          </span>
+          <Slider
+            value={[timelineValue]}
+            onValueChange={(value) => {
+              if (!hasDuration) return;
+              setIsSeeking(true);
+              setSeekValue(value[0] ?? 0);
+            }}
+            onValueCommit={(value) => {
+              if (!hasDuration) return;
+              const nextValue = value[0] ?? 0;
+              setIsSeeking(false);
+              setSeekValue(nextValue);
+              setCurrentTime(nextValue);
+              postCommand("seekTo", [nextValue, true]);
+            }}
+            min={0}
+            max={hasDuration ? duration : 1}
+            step={1}
+            disabled={!song || !hasDuration}
+            aria-label="Song timeline"
+          />
+          <span className="text-xs tabular-nums text-muted-foreground w-12">
+            {hasDuration ? formatTime(duration) : "--:--"}
+          </span>
         </div>
       </div>
       <div className="flex items-center gap-2 w-full max-w-xs">
