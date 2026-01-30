@@ -113,7 +113,7 @@ export function useYouTubePlayer({
     const uniqueIds = Array.from(new Set(upcomingVideoIds)).slice(0, 5);
     uniqueIds.forEach((id) => {
       if (!id || id === currentVideoId) return;
-      window.electronAPI.preloadAudio(id).catch(() => {});
+      window.electronAPI.preloadAudio(id).catch(() => { });
     });
   }, [upcomingVideoIds, currentVideoId]);
 

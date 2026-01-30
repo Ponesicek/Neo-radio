@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import started from "electron-squirrel-startup";
 import { streamText, Output, stepCountIs } from "ai";
+import Store from "electron-store";
 import {
   getCachedVideoDetails,
   searchYoutube,
@@ -14,12 +15,14 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { ensureAudioFile } from "./audioDownload";
 import { getLatestNews } from "./news";
 import { synthetizeSpeech } from "./speech";
+import type { StoreSchema, StoredPlaylist } from "./lib/utils";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
 const openrouter = createOpenRouter()
+const store = new Store<StoreSchema>();
 
 type SongPlaylistItem = {
   isSong: true;
@@ -121,6 +124,72 @@ ipcMain.handle(
   },
 );
 
+ipcMain.removeHandler("list-playlists");
+ipcMain.handle("list-playlists", () => {
+  return store.get("playlists", []) ?? [];
+});
+
+ipcMain.removeHandler("save-playlist");
+ipcMain.handle(
+  "save-playlist",
+  (
+    _event,
+    payload: {
+      name: string;
+      prompt: string;
+      newsFrequency: number;
+      items: PlaylistItem[];
+    },
+  ) => {
+    const normalizedName = payload?.name?.trim() ?? "";
+    const normalizedPrompt = payload?.prompt?.trim() ?? "";
+    const name = normalizedName || normalizedPrompt || "Untitled playlist";
+    const newsFrequency = Number.isFinite(payload?.newsFrequency)
+      ? Math.max(0, Math.floor(payload.newsFrequency))
+      : 0;
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    const songs = items.filter(
+      (item): item is SongPlaylistItem => !!item && item.isSong,
+    );
+
+    if (songs.length === 0) {
+      return store.get("playlists", []) ?? [];
+    }
+
+    const entry: StoredPlaylist = {
+      id: randomUUID(),
+      name,
+      prompt: normalizedPrompt,
+      newsFrequency,
+      songs,
+      createdAt: new Date().toISOString(),
+    };
+    const existing = (store.get("playlists", []) ?? []) as StoredPlaylist[];
+    const updated = [entry, ...existing];
+    store.set("playlists", updated);
+    return updated;
+  },
+);
+
+ipcMain.removeHandler("delete-playlist");
+ipcMain.handle("delete-playlist", (_event, playlistId: string) => {
+  const existing = (store.get("playlists", []) ?? []) as StoredPlaylist[];
+  const updated = existing.filter((entry) => entry.id !== playlistId);
+  store.set("playlists", updated);
+  return updated;
+});
+
+ipcMain.removeHandler("load-playlist");
+ipcMain.handle("load-playlist", async (_event, playlistId: string) => {
+  const existing = (store.get("playlists", []) ?? []) as StoredPlaylist[];
+  const playlist = existing.find((entry) => entry.id === playlistId);
+  if (!playlist) {
+    return [];
+  }
+  newsAudioTasks.clear();
+  return buildPlaylistWithNews(playlist.songs, playlist.newsFrequency);
+});
+
 ipcMain.removeHandler("ensure-audio");
 ipcMain.handle("ensure-audio", async (_event, videoId: string) => {
   const audioPath = await ensureAudioFile(videoId);
@@ -152,17 +221,17 @@ ipcMain.handle(
       task = synthetizeSpeech(request.newsText);
       newsAudioTasks.set(request.newsId, task);
     }
-  if (!task) {
-    throw new Error(`Unknown news audio id: ${request.newsId}`);
-  }
-  const audioPath = await task;
-  const data = await fs.readFile(audioPath);
-  const buffer = data.buffer.slice(
-    data.byteOffset,
-    data.byteOffset + data.byteLength,
-  );
-  const mimeType = getAudioMimeType(audioPath);
-  return { data: buffer, mimeType };
+    if (!task) {
+      throw new Error(`Unknown news audio id: ${request.newsId}`);
+    }
+    const audioPath = await task;
+    const data = await fs.readFile(audioPath);
+    const buffer = data.buffer.slice(
+      data.byteOffset,
+      data.byteOffset + data.byteLength,
+    );
+    const mimeType = getAudioMimeType(audioPath);
+    return { data: buffer, mimeType };
   },
 );
 

@@ -1,4 +1,4 @@
-import type { PlaylistItem } from "./preload";
+import type { PlaylistItem, SavedPlaylist, SavePlaylistPayload } from "./preload";
 
 declare global {
   interface Window {
@@ -15,10 +15,14 @@ declare global {
         newsText: string;
       }) => Promise<{ data: ArrayBuffer; mimeType: string }>;
       preloadAudio: (videoId: string) => Promise<void>;
+      listPlaylists: () => Promise<SavedPlaylist[]>;
+      savePlaylist: (payload: SavePlaylistPayload) => Promise<SavedPlaylist[]>;
+      deletePlaylist: (playlistId: string) => Promise<SavedPlaylist[]>;
+      loadPlaylist: (playlistId: string) => Promise<PlaylistItem[]>;
       onPlaylistItem: (callback: (item: PlaylistItem) => void) => () => void;
       onPlaylistReady: (callback: () => void) => () => void;
     };
   }
 }
 
-export {};
+export { };

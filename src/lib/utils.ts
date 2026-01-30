@@ -5,6 +5,24 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export type StoredPlaylistSong = {
+  isSong: true;
+  ID: string;
+  name: string;
+  artist: string;
+  thumbnailUrl: string;
+  duration: string;
+};
+
+export type StoredPlaylist = {
+  id: string;
+  name: string;
+  prompt: string;
+  newsFrequency: number;
+  songs: StoredPlaylistSong[];
+  createdAt: string;
+};
+
 export interface StoreSchema {
   music: {
     youtube: {
@@ -29,6 +47,7 @@ export interface StoreSchema {
     };
   };
   youtubeApiKey: string;
+  playlists?: StoredPlaylist[];
 }
 
 export function parseDuration(isoDuration: string): string {

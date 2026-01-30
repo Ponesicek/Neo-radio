@@ -17,7 +17,11 @@ export function usePlaylistGeneration({
       resetPlaylist();
       resetPlayback();
       try {
-        await window.electronAPI.generatePlaylist(prompt, newsFrequency);
+        const items = await window.electronAPI.generatePlaylist(
+          prompt,
+          newsFrequency,
+        );
+        return items ?? [];
       } finally {
         setIsGenerating(false);
       }

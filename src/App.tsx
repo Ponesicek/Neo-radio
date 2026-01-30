@@ -6,20 +6,13 @@ import { Separator } from "./components/ui/separator";
 import { Playlist, type SongRowProps } from "./components/Playlist";
 import { PlaybackBar } from "./components/PlaybackBar";
 import { usePlaybackControl } from "./hooks/usePlaybackControl";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePlaylist } from "./hooks/usePlaylist";
 import { usePlaylistGeneration } from "./hooks/usePlaylistGeneration";
-
-const samplePlaylists: PlaylistRowData[] = [
-  { name: "Rock" },
-  { name: "Metal" },
-  { name: "Jazz" },
-  { name: "Classical" },
-  { name: "Electronic" },
-];
+import type { PlaylistItem, SavedPlaylist } from "./preload";
 
 export default function App() {
-  const { playlist, resetPlaylist, isReady } = usePlaylist();
+  const { playlist, resetPlaylist, isReady, loadPlaylist } = usePlaylist();
   const {
     currentItem,
     currentIndex,
@@ -27,7 +20,6 @@ export default function App() {
     canNext,
     canPrev,
     playPause,
-    playFromSidebar,
     next,
     prev,
     resetPlayback,
@@ -36,6 +28,77 @@ export default function App() {
     resetPlaylist,
     resetPlayback,
   });
+  const [savedPlaylists, setSavedPlaylists] = useState<PlaylistRowData[]>([]);
+  const [lastGeneratedItems, setLastGeneratedItems] = useState<PlaylistItem[]>(
+    [],
+  );
+  const [lastGeneratedPrompt, setLastGeneratedPrompt] = useState("");
+  const [lastGeneratedNewsFrequency, setLastGeneratedNewsFrequency] =
+    useState(0);
+  const [canSave, setCanSave] = useState(false);
+  const mapPlaylistToRow = useCallback(
+    (entry: SavedPlaylist): PlaylistRowData => ({
+      id: entry.id,
+      name: entry.name,
+    }),
+    [],
+  );
+  const refreshPlaylists = useCallback(async () => {
+    const entries = await window.electronAPI.listPlaylists();
+    setSavedPlaylists(entries.map(mapPlaylistToRow));
+  }, [mapPlaylistToRow]);
+  const handleGenerate = useCallback(
+    async (prompt: string, newsFrequency: number) => {
+      const items = await generate(prompt, newsFrequency);
+      const nextItems = Array.isArray(items) ? items : [];
+      setLastGeneratedItems(nextItems);
+      setLastGeneratedPrompt(prompt);
+      setLastGeneratedNewsFrequency(newsFrequency);
+      setCanSave(nextItems.length > 0);
+    },
+    [generate],
+  );
+  const handleSave = useCallback(
+    async (name: string) => {
+      if (!lastGeneratedItems.length) return;
+      const trimmedName = name.trim();
+      if (!trimmedName) return;
+      const updated = await window.electronAPI.savePlaylist({
+        name: trimmedName,
+        prompt: lastGeneratedPrompt,
+        newsFrequency: lastGeneratedNewsFrequency,
+        items: lastGeneratedItems,
+      });
+      setSavedPlaylists(updated.map(mapPlaylistToRow));
+      setCanSave(false);
+    },
+    [
+      lastGeneratedItems,
+      lastGeneratedPrompt,
+      lastGeneratedNewsFrequency,
+      mapPlaylistToRow,
+    ],
+  );
+  const handleLoad = useCallback(
+    async (playlistId: string) => {
+      resetPlaylist();
+      resetPlayback();
+      const items = await window.electronAPI.loadPlaylist(playlistId);
+      loadPlaylist(items);
+      setCanSave(false);
+      setLastGeneratedItems([]);
+      setLastGeneratedPrompt("");
+      setLastGeneratedNewsFrequency(0);
+    },
+    [resetPlayback, resetPlaylist, loadPlaylist],
+  );
+  const handleDelete = useCallback(
+    async (playlistId: string) => {
+      const updated = await window.electronAPI.deletePlaylist(playlistId);
+      setSavedPlaylists(updated.map(mapPlaylistToRow));
+    },
+    [mapPlaylistToRow],
+  );
   const activeVideoId =
     isPlaying && currentItem?.isSong ? currentItem.videoId : null;
   const upcomingVideoIds = useMemo(() => {
@@ -48,15 +111,22 @@ export default function App() {
       .map((item) => item.videoId);
   }, [playlist, currentIndex]);
 
+  useEffect(() => {
+    refreshPlaylists().catch(() => { });
+  }, [refreshPlaylists]);
+
   return (
     <div className="h-screen w-full bg-background flex flex-col">
       <div className="flex flex-1 p-4 gap-4 overflow-hidden">
         <OptionsSidebar
-          playlists={samplePlaylists}
-          onGenerate={generate}
+          playlists={savedPlaylists}
+          onGenerate={handleGenerate}
+          onSave={handleSave}
+          onLoadPlaylist={handleLoad}
+          onDeletePlaylist={handleDelete}
           isGenerating={isGenerating}
-          hasGenerated={isReady}
-          onPlay={playFromSidebar}
+          canSave={canSave}
+          defaultSaveName={lastGeneratedPrompt}
         />
         <Separator orientation="vertical" />
         <div className="flex-1 overflow-auto">
