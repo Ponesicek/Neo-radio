@@ -1,4 +1,4 @@
-import { Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { Loader2, Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
 import type { SongRowProps } from "./Playlist";
@@ -115,10 +115,16 @@ export function PlaybackBar({
             variant="outline"
             size="icon"
             onClick={onPlayPause}
-            disabled={!item}
+            disabled={!item || isLoading}
             aria-label={isPlaying ? "Pause" : "Play"}
           >
-            {isPlaying ? <Pause /> : <Play />}
+            {isLoading ? (
+              <Loader2 className="animate-spin" />
+            ) : isPlaying ? (
+              <Pause />
+            ) : (
+              <Play />
+            )}
           </Button>
           <Button
             variant="ghost"
