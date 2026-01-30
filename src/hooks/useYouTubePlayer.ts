@@ -4,7 +4,9 @@ interface YouTubePlayerOptions {
   videoId: string | null;
   upcomingVideoIds?: string[];
   isPlaying: boolean;
+  canPrev: boolean;
   canNext: boolean;
+  onPrev: () => void;
   onNext: () => void;
   onPlayPause: () => void;
 }
@@ -13,7 +15,9 @@ export function useYouTubePlayer({
   videoId,
   upcomingVideoIds,
   isPlaying,
+  canPrev,
   canNext,
+  onPrev,
   onNext,
   onPlayPause,
 }: YouTubePlayerOptions) {
@@ -22,6 +26,7 @@ export function useYouTubePlayer({
   const requestIdRef = useRef(0);
   const isSeekingRef = useRef(false);
   const objectUrlRef = useRef<string | null>(null);
+  const suppressPauseSyncRef = useRef(false);
 
   const [audioSrc, setAudioSrc] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -107,6 +112,9 @@ export function useYouTubePlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
+    if (!audio.paused) {
+      suppressPauseSyncRef.current = true;
+    }
     audio.pause();
     audio.currentTime = 0;
 
@@ -143,6 +151,31 @@ export function useYouTubePlayer({
   }, [volume]);
 
   useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    const session = navigator.mediaSession;
+
+    session.setActionHandler("play", () => {
+      if (!isPlaying) {
+        onPlayPause();
+      }
+    });
+    session.setActionHandler("pause", () => {
+      if (isPlaying) {
+        onPlayPause();
+      }
+    });
+    session.setActionHandler("nexttrack", canNext ? onNext : null);
+    session.setActionHandler("previoustrack", canPrev ? onPrev : null);
+
+    return () => {
+      session.setActionHandler("play", null);
+      session.setActionHandler("pause", null);
+      session.setActionHandler("nexttrack", null);
+      session.setActionHandler("previoustrack", null);
+    };
+  }, [isPlaying, onPlayPause, canNext, onNext, canPrev, onPrev]);
+
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !audioSrc) return;
 
@@ -174,11 +207,30 @@ export function useYouTubePlayer({
       }
     };
 
+    const handlePlay = () => {
+      if (!isPlaying) {
+        onPlayPause();
+      }
+    };
+
+    const handlePause = () => {
+      if (suppressPauseSyncRef.current) {
+        suppressPauseSyncRef.current = false;
+        return;
+      }
+      if (audio.ended) return;
+      if (isPlaying) {
+        onPlayPause();
+      }
+    };
+
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("durationchange", handleLoadedMetadata);
     audio.addEventListener("canplay", handleLoadedMetadata);
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
 
     if (Number.isFinite(audio.duration) && audio.duration > 0) {
       setDuration(audio.duration);
@@ -193,6 +245,8 @@ export function useYouTubePlayer({
       audio.removeEventListener("canplay", handleLoadedMetadata);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
     };
   }, [audioSrc, videoId, canNext, onNext, onPlayPause, isPlaying]);
 

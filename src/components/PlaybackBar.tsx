@@ -58,7 +58,9 @@ export function PlaybackBar({
     videoId: song?.videoId ?? null,
     upcomingVideoIds,
     isPlaying,
+    canPrev,
     canNext,
+    onPrev,
     onNext,
     onPlayPause,
   });
