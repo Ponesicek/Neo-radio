@@ -11,7 +11,7 @@ interface PlaylistRowData {
 
 interface OptionsSidebarProps {
   playlists: PlaylistRowData[];
-  onGenerate: (prompt: string) => Promise<void>;
+  onGenerate: (prompt: string, newsFrequency: number) => Promise<void>;
   onPlay?: () => void;
   isGenerating: boolean;
   hasGenerated: boolean;
@@ -28,6 +28,7 @@ export function OptionsSidebar({
   const [lastGeneratedPrompt, setLastGeneratedPrompt] = useState<string | null>(
     null,
   );
+  const [newsFrequency, setNewsFrequency] = useState(0);
   const trimmedPrompt = prompt.trim();
   const isReadyToPlay =
     hasGenerated && !!trimmedPrompt && trimmedPrompt === lastGeneratedPrompt;
@@ -43,7 +44,7 @@ export function OptionsSidebar({
       return;
     }
     if (!trimmedPrompt) return;
-    await onGenerate(trimmedPrompt);
+    await onGenerate(trimmedPrompt, newsFrequency);
     setLastGeneratedPrompt(trimmedPrompt);
   };
 
@@ -69,7 +70,8 @@ export function OptionsSidebar({
           min={0}
           max={4}
           step={1}
-          defaultValue={[0]}
+          value={[newsFrequency]}
+          onValueChange={(value) => setNewsFrequency(value[0] ?? 0)}
         />
       </div>
       <Table>

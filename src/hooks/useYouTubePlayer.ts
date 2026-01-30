@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { SongRowProps } from "../components/Playlist";
+
+const isNewsItem = (
+  entry: SongRowProps,
+): entry is Extract<SongRowProps, { isSong: false }> => !entry.isSong;
 
 interface YouTubePlayerOptions {
-  videoId: string | null;
+  item: SongRowProps | null;
   upcomingVideoIds?: string[];
   isPlaying: boolean;
   canPrev: boolean;
@@ -12,7 +17,7 @@ interface YouTubePlayerOptions {
 }
 
 export function useYouTubePlayer({
-  videoId,
+  item,
   upcomingVideoIds,
   isPlaying,
   canPrev,
@@ -36,13 +41,17 @@ export function useYouTubePlayer({
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
 
+  const playbackId = item ? (isNewsItem(item) ? item.newsId : item.videoId) : null;
+  const currentVideoId =
+    item && !isNewsItem(item) ? item.videoId : null;
+
   useEffect(() => {
     isSeekingRef.current = isSeeking;
   }, [isSeeking]);
 
   useEffect(() => {
     handledEndRef.current = null;
-  }, [videoId]);
+  }, [playbackId]);
 
   useEffect(() => {
     setAudioSrc("");
@@ -50,20 +59,29 @@ export function useYouTubePlayer({
     setDuration(0);
     setSeekValue(0);
     setIsSeeking(false);
-    setIsLoading(!!videoId);
+    setIsLoading(!!item);
 
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
 
-    if (!videoId) return;
+    if (!item) return;
 
     const requestId = ++requestIdRef.current;
     let cancelled = false;
 
-    window.electronAPI
-      .ensureAudio(videoId)
+    let loadPromise: Promise<{ data: ArrayBuffer; mimeType: string }>;
+    if (isNewsItem(item)) {
+      loadPromise = window.electronAPI.ensureNewsAudio({
+        newsId: item.newsId,
+        newsText: item.NewsContent,
+      });
+    } else {
+      loadPromise = window.electronAPI.ensureAudio(item.videoId);
+    }
+
+    loadPromise
       .then(({ data, mimeType }) => {
         const blob = new Blob([data as ArrayBuffer], {
           type: mimeType || "application/octet-stream",
@@ -88,16 +106,16 @@ export function useYouTubePlayer({
     return () => {
       cancelled = true;
     };
-  }, [videoId]);
+  }, [item]);
 
   useEffect(() => {
     if (!upcomingVideoIds || upcomingVideoIds.length === 0) return;
     const uniqueIds = Array.from(new Set(upcomingVideoIds)).slice(0, 5);
     uniqueIds.forEach((id) => {
-      if (!id || id === videoId) return;
+      if (!id || id === currentVideoId) return;
       window.electronAPI.preloadAudio(id).catch(() => {});
     });
-  }, [upcomingVideoIds, videoId]);
+  }, [upcomingVideoIds, currentVideoId]);
 
   useEffect(() => {
     return () => {
@@ -194,8 +212,8 @@ export function useYouTubePlayer({
     };
 
     const handleEnded = () => {
-      if (handledEndRef.current === videoId) return;
-      handledEndRef.current = videoId;
+      if (handledEndRef.current === playbackId) return;
+      handledEndRef.current = playbackId;
 
       if (canNext) {
         onNext();
@@ -248,7 +266,7 @@ export function useYouTubePlayer({
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
     };
-  }, [audioSrc, videoId, canNext, onNext, onPlayPause, isPlaying]);
+  }, [audioSrc, playbackId, canNext, onNext, onPlayPause, isPlaying]);
 
   useEffect(() => {
     if (!isSeeking) {

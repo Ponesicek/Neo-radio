@@ -29,7 +29,7 @@ export interface NewsItem {
 
 /**
  * Fetches RSS feeds from the store and returns the 5 newest news items
- * @returns Array of the 5 most recent news items across all feeds
+ * @returns Array of the 10 most recent news items across all feeds
  */
 export async function getLatestNews(): Promise<NewsItem[]> {
     const rssFeeds = store.get("news.providers.rss", ["https://news.ycombinator.com/rss"]);
@@ -73,5 +73,5 @@ export async function getLatestNews(): Promise<NewsItem[]> {
     });
 
     // Return the 5 newest items
-    return sortedItems.slice(0, 5);
+    return sortedItems.slice(0, 10);
 }

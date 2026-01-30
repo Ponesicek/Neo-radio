@@ -17,6 +17,7 @@ type SongRowProps =
     timeOfPlay: string;
     NewsContent: string;
     durationSeconds?: number;
+    newsId: string;
   };
 
 interface PlaylistProps {
@@ -87,6 +88,7 @@ function SongRow(props: SongRowDisplayProps) {
     isSong: false;
     timeOfPlay: string;
     NewsContent: string;
+    newsId: string;
   };
   return (
     <TableRow className="flex flex-row w-full justify-between h-16">

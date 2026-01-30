@@ -4,10 +4,10 @@ import { Slider } from "./ui/slider";
 import type { SongRowProps } from "./Playlist";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
 
-type PlaybackSong = Extract<SongRowProps, { isSong: true }>;
+type PlaybackItem = SongRowProps;
 
 interface PlaybackBarProps {
-  song: PlaybackSong | null;
+  item: PlaybackItem | null;
   upcomingVideoIds?: string[];
   isPlaying: boolean;
   onPlayPause: () => void;
@@ -34,7 +34,7 @@ function formatTime(value: number) {
 }
 
 export function PlaybackBar({
-  song,
+  item,
   upcomingVideoIds,
   isPlaying,
   onPlayPause,
@@ -43,6 +43,9 @@ export function PlaybackBar({
   canNext,
   canPrev,
 }: PlaybackBarProps) {
+  const isNewsItem = (
+    entry: SongRowProps,
+  ): entry is Extract<SongRowProps, { isSong: false }> => !entry.isSong;
   const {
     audioRef,
     audioSrc,
@@ -55,7 +58,7 @@ export function PlaybackBar({
     onSeekValueChange,
     onSeekCommit,
   } = useYouTubePlayer({
-    videoId: song?.videoId ?? null,
+    item,
     upcomingVideoIds,
     isPlaying,
     canPrev,
@@ -69,17 +72,30 @@ export function PlaybackBar({
     <div className="w-full border-t bg-card px-4 py-3 flex flex-row items-between justify-between">
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-3 w-fit">
-          {song ? (
+          {item ? (
             <>
-              <img
-                src={song.thumbnailUrl}
-                alt={`${song.name} cover`}
-                className="h-10 w-16 object-cover rounded-sm"
-              />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">{song.name}</p>
-                <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-              </div>
+              {isNewsItem(item) ? (
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">News update</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {item.NewsContent}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <img
+                    src={item.thumbnailUrl}
+                    alt={`${item.name} cover`}
+                    className="h-10 w-16 object-cover rounded-sm"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{item.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.artist}
+                    </p>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <p className="text-sm text-muted-foreground">No track loaded</p>
@@ -99,7 +115,7 @@ export function PlaybackBar({
             variant="outline"
             size="icon"
             onClick={onPlayPause}
-            disabled={!song}
+            disabled={!item}
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isPlaying ? <Pause /> : <Play />}
@@ -127,7 +143,7 @@ export function PlaybackBar({
             min={0}
             max={hasDuration ? duration : 1}
             step={1}
-            disabled={!song || !hasDuration || isLoading}
+            disabled={!item || !hasDuration || isLoading}
             aria-label="Song timeline"
           />
           <span className="text-xs tabular-nums text-muted-foreground w-12">
@@ -144,7 +160,7 @@ export function PlaybackBar({
           max={100}
         />
       </div>
-      {song && audioSrc ? (
+      {item && audioSrc ? (
         <audio
           ref={audioRef}
           src={audioSrc}

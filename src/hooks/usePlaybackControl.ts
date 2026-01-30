@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SongRowProps } from "../components/Playlist";
 
-type PlaybackSong = Extract<SongRowProps, { isSong: true }>;
-
-export function usePlaybackControl(songs: PlaybackSong[]) {
+export function usePlaybackControl(
+  items: SongRowProps[],
+  isReady: boolean,
+) {
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    if (songs.length === 0) {
+    if (items.length === 0) {
       setCurrentIndex(null);
       setIsPlaying(false);
+      return;
+    }
+    if (!isReady) {
       return;
     }
     if (currentIndex === null) {
@@ -18,47 +22,47 @@ export function usePlaybackControl(songs: PlaybackSong[]) {
       setIsPlaying(true);
       return;
     }
-    if (currentIndex >= songs.length) {
-      setCurrentIndex(songs.length - 1);
+    if (currentIndex >= items.length) {
+      setCurrentIndex(items.length - 1);
     }
-  }, [songs.length, currentIndex]);
+  }, [items.length, currentIndex, isReady]);
 
-  const currentSong = useMemo(() => {
+  const currentItem = useMemo(() => {
     if (currentIndex === null) return null;
-    return songs[currentIndex] ?? null;
-  }, [currentIndex, songs]);
+    return items[currentIndex] ?? null;
+  }, [currentIndex, items]);
 
   const canPrev = currentIndex !== null && currentIndex > 0;
   const canNext =
-    currentIndex !== null && currentIndex < Math.max(songs.length - 1, 0);
+    currentIndex !== null && currentIndex < Math.max(items.length - 1, 0);
 
   const playPause = useCallback(() => {
-    if (!currentSong) return;
+    if (!currentItem || !isReady) return;
     setIsPlaying((prev) => !prev);
-  }, [currentSong]);
+  }, [currentItem, isReady]);
 
   const playFromSidebar = useCallback(() => {
-    if (!currentSong) return;
+    if (!currentItem || !isReady) return;
     setIsPlaying(true);
-  }, [currentSong]);
+  }, [currentItem, isReady]);
 
   const next = useCallback(() => {
-    if (!songs.length) return;
+    if (!items.length || !isReady) return;
     setCurrentIndex((prev) => {
       if (prev === null) return 0;
-      return Math.min(prev + 1, songs.length - 1);
+      return Math.min(prev + 1, items.length - 1);
     });
     setIsPlaying(true);
-  }, [songs.length]);
+  }, [items.length, isReady]);
 
   const prev = useCallback(() => {
-    if (!songs.length) return;
+    if (!items.length || !isReady) return;
     setCurrentIndex((prev) => {
       if (prev === null) return 0;
       return Math.max(prev - 1, 0);
     });
     setIsPlaying(true);
-  }, [songs.length]);
+  }, [items.length, isReady]);
 
   const resetPlayback = useCallback(() => {
     setCurrentIndex(null);
@@ -67,7 +71,7 @@ export function usePlaybackControl(songs: PlaybackSong[]) {
 
   return {
     currentIndex,
-    currentSong,
+    currentItem,
     isPlaying,
     canNext,
     canPrev,

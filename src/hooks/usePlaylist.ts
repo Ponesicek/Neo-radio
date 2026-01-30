@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SongRowProps } from "../components/Playlist";
+import type { PlaylistItem } from "../preload";
 import { formatTimeOfDay } from "../lib/time";
 import { parseIsoDurationToSeconds } from "../lib/utils";
 
 export function usePlaylist() {
   const [playlist, setPlaylist] = useState<SongRowProps[]>([]);
   const playlistStartRef = useRef<Date | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const isNewsItem = (
+    entry: PlaylistItem,
+  ): entry is Extract<PlaylistItem, { isSong: false }> => !entry.isSong;
 
   useEffect(() => {
-    const unsubscribe = window.electronAPI.onPlaylistItem((item) => {
+    const unsubscribeItems = window.electronAPI.onPlaylistItem((item) => {
       setPlaylist((prev) => {
         const startTime = playlistStartRef.current ?? new Date();
         if (!playlistStartRef.current) {
@@ -18,38 +23,53 @@ export function usePlaylist() {
           if (entry.isSong) return total + entry.durationSeconds;
           return total + (entry.durationSeconds ?? 0);
         }, 0);
-        const durationSeconds = parseIsoDurationToSeconds(item.duration);
         const playTime = new Date(startTime.getTime() + elapsedSeconds * 1000);
 
+        if (!isNewsItem(item)) {
+          const durationSeconds = parseIsoDurationToSeconds(item.duration);
+          return [
+            ...prev,
+            {
+              isSong: true,
+              timeOfPlay: formatTimeOfDay(playTime),
+              artist: item.artist,
+              name: item.name,
+              thumbnailUrl: item.thumbnailUrl,
+              videoId: item.ID,
+              durationSeconds,
+            },
+          ];
+        }
+
+        const durationSeconds = item.durationSeconds;
         return [
           ...prev,
           {
-            isSong: true,
+            isSong: false,
             timeOfPlay: formatTimeOfDay(playTime),
-            artist: item.artist,
-            name: item.name,
-            thumbnailUrl: item.thumbnailUrl,
-            videoId: item.ID,
+            NewsContent: item.newsText,
             durationSeconds,
+            newsId: item.newsId,
           },
         ];
       });
     });
-    return unsubscribe;
-  }, []);
 
-  const songs = useMemo(
-    () =>
-      playlist.filter(
-        (item): item is Extract<SongRowProps, { isSong: true }> => item.isSong,
-      ),
-    [playlist],
-  );
+    const unsubscribeReady = window.electronAPI.onPlaylistReady(() => {
+      setIsReady(true);
+    });
+
+    return () => {
+      unsubscribeItems();
+      unsubscribeReady();
+    };
+  }, []);
 
   const resetPlaylist = useCallback(() => {
     setPlaylist([]);
     playlistStartRef.current = null;
+    setIsReady(false);
   }, []);
 
-  return { playlist, songs, resetPlaylist };
+  return { playlist, resetPlaylist, isReady };
 }

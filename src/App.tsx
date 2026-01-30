@@ -3,7 +3,7 @@ import {
   type PlaylistRowData,
 } from "./components/OptionsSidabar";
 import { Separator } from "./components/ui/separator";
-import { Playlist } from "./components/Playlist";
+import { Playlist, type SongRowProps } from "./components/Playlist";
 import { PlaybackBar } from "./components/PlaybackBar";
 import { usePlaybackControl } from "./hooks/usePlaybackControl";
 import { useMemo } from "react";
@@ -19,9 +19,9 @@ const samplePlaylists: PlaylistRowData[] = [
 ];
 
 export default function App() {
-  const { playlist, songs, resetPlaylist } = usePlaylist();
+  const { playlist, resetPlaylist, isReady } = usePlaylist();
   const {
-    currentSong,
+    currentItem,
     currentIndex,
     isPlaying,
     canNext,
@@ -31,19 +31,22 @@ export default function App() {
     next,
     prev,
     resetPlayback,
-  } = usePlaybackControl(songs);
+  } = usePlaybackControl(playlist, isReady);
   const { isGenerating, generate } = usePlaylistGeneration({
     resetPlaylist,
     resetPlayback,
   });
   const activeVideoId =
-    isPlaying && currentSong ? currentSong.videoId : null;
+    isPlaying && currentItem?.isSong ? currentItem.videoId : null;
   const upcomingVideoIds = useMemo(() => {
     if (currentIndex === null) return [];
-    return songs
-      .slice(currentIndex + 1, currentIndex + 6)
+    return playlist
+      .slice(currentIndex + 1)
+      .filter(
+        (item): item is Extract<SongRowProps, { isSong: true }> => item.isSong,
+      )
       .map((item) => item.videoId);
-  }, [songs, currentIndex]);
+  }, [playlist, currentIndex]);
 
   return (
     <div className="h-screen w-full bg-background flex flex-col">
@@ -52,7 +55,7 @@ export default function App() {
           playlists={samplePlaylists}
           onGenerate={generate}
           isGenerating={isGenerating}
-          hasGenerated={songs.length > 0}
+          hasGenerated={isReady}
           onPlay={playFromSidebar}
         />
         <Separator orientation="vertical" />
@@ -61,7 +64,7 @@ export default function App() {
         </div>
       </div>
       <PlaybackBar
-        song={currentSong}
+        item={currentItem}
         upcomingVideoIds={upcomingVideoIds}
         isPlaying={isPlaying}
         onPlayPause={playPause}

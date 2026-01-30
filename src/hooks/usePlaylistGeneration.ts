@@ -12,12 +12,12 @@ export function usePlaylistGeneration({
   const [isGenerating, setIsGenerating] = useState(false);
 
   const generate = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, newsFrequency: number) => {
       setIsGenerating(true);
       resetPlaylist();
       resetPlayback();
       try {
-        await window.electronAPI.generatePlaylist(prompt);
+        await window.electronAPI.generatePlaylist(prompt, newsFrequency);
       } finally {
         setIsGenerating(false);
       }
